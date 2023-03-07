@@ -3,6 +3,9 @@ pub fn solve(sudoku: &mut [u8; 81]) {
 }
 
 fn rec_solve(i: usize, sudoku: &mut [u8; 81]) -> bool {
+    if i >= 81 {
+        return true;
+    }
     if sudoku[i] != 0 {
         return rec_solve(i + 1, sudoku);
     }
@@ -12,7 +15,6 @@ fn rec_solve(i: usize, sudoku: &mut [u8; 81]) -> bool {
         }
         // try using n in the tile
         sudoku[i] = n;
-        pretty_print(sudoku);
         if rec_solve(i + 1, sudoku) {
             return true;
         }
@@ -33,8 +35,8 @@ fn is_tile_valid(n: u8, i: usize, grid: &[u8; 81]) -> bool {
 
     // check that the same number is not in the same column
     let col = i % 9;
-    for i in 0..9 {
-        if n == grid[i * 9 + col] {
+    for j in 0..9 {
+        if n == grid[j * 9 + col] {
             return false;
         }
     }
@@ -42,8 +44,8 @@ fn is_tile_valid(n: u8, i: usize, grid: &[u8; 81]) -> bool {
     // check that the same number is not in the same square
     let square_line = line / 3;
     let square_col = col / 3;
-    for x in square_col..square_col + 3 {
-        for y in square_line..square_line + 3 {
+    for y in square_line * 3..square_line * 3 + 3 {
+        for x in square_col * 3..square_col * 3 + 3 {
             if n == grid[y * 9 + x] {
                 return false;
             }
