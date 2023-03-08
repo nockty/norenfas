@@ -1,3 +1,6 @@
+#![feature(portable_simd)]
+use std::simd::{u8x8, SimdPartialEq};
+
 pub fn solve(sudoku: &mut [u8; 81]) -> bool {
     rec_solve(0, sudoku)
 }
@@ -27,10 +30,11 @@ fn rec_solve(i: usize, sudoku: &mut [u8; 81]) -> bool {
 fn is_tile_valid(n: u8, i: usize, grid: &[u8; 81]) -> bool {
     // check that the same number is not in the same line
     let line = i / 9;
-    for m in &grid[line * 9..line * 9 + 9] {
-        if n == *m {
-            return false;
-        }
+    // use SIMD vectors for faster comparison
+    let n_vec = u8x8::from_array([n; 8]);
+    let line_vec = u8x8::from_slice(&grid[line * 9..line * 9 + 9]);
+    if n_vec.simd_eq(line_vec).any() || n == grid[line * 9 + 8] {
+        return false;
     }
 
     // check that the same number is not in the same column
