@@ -13,16 +13,12 @@ The `benches` folder contains a couple [Criterion.rs](https://bheisler.github.io
 Typical results on my machine:
 
 ```
-solve easy:   ~5µs
-solve medium: ~140µs
-solve hard:   ~230µs
+solve easy:   ~4.7µs
+solve medium: ~120µs
+solve hard:   ~200µs
 ```
 
 To profile and get a [flamegraph](https://github.com/flamegraph-rs/flamegraph): `cargo flamegraph --root --bench solve_benchmark -- --bench`. Well, it isn't that useful for this project that has about two functions.
-
-## Next steps
-
-- **Add test case(s).** To check that the same number is not in the same line in `is_tile_valid`, we use a SIMD operation and a regular equality. Current tests pass with or without that last equality so this code path is currently not tested.
 
 ## Resources
 

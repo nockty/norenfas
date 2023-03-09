@@ -1,9 +1,17 @@
 #![feature(portable_simd)]
-use std::simd::{u8x8, SimdPartialEq};
+use std::simd::{u8x16, SimdPartialEq};
 
 pub fn solve(sudoku: &mut [u8; 81]) -> bool {
-    let mut sudoku = Sudoku::new(sudoku);
-    rec_solve(0, &mut sudoku)
+    let grid = sudoku;
+    let mut sudoku = Sudoku::new(grid);
+
+    if rec_solve(0, &mut sudoku) {
+        for i in 0..81 {
+            grid[i] = sudoku.line_grid[i]
+        }
+        return true;
+    }
+    return false;
 }
 
 fn rec_solve(i: usize, sudoku: &mut Sudoku) -> bool {
@@ -28,28 +36,29 @@ fn rec_solve(i: usize, sudoku: &mut Sudoku) -> bool {
     return false;
 }
 
-/// Sudoku holds a line-by-line representation and column-by-column representation of the same sudoku. The goal is
-/// to be able to use SIMD operations for both the line check and the column check.
-struct Sudoku<'a> {
-    line_grid: &'a mut [u8; 81],
-    col_grid: [u8; 81],
-    square_grid: [u8; 81],
+/// Sudoku holds line-by-line, column-by-column, and square-by-square representations of the same sudoku.
+/// The goal is to be able to use SIMD operations for all kinds of checks. Their length is 88 so that we
+/// can use 128-bit SIMD vectors with 16 elements.
+struct Sudoku {
+    line_grid: [u8; 88],
+    col_grid: [u8; 88],
+    square_grid: [u8; 88],
 }
 
-impl Sudoku<'_> {
+impl Sudoku {
     fn new(grid: &mut [u8; 81]) -> Sudoku {
-        // create the transposed sudoku (column-by-column representation)
-        let mut transposed_col = [0u8; 81];
+        let mut copy = [0u8; 88];
+        let mut transposed_col = [0u8; 88];
+        let mut transposed_square = [0u8; 88];
+
         for i in 0..81 {
-            transposed_col[Self::transpose_col(i)] = grid[i]
-        }
-        let mut transposed_square = [0u8; 81];
-        for i in 0..81 {
-            transposed_square[Self::transpose_square(i)] = grid[i]
+            copy[i] = grid[i];
+            transposed_col[Self::transpose_col(i)] = grid[i];
+            transposed_square[Self::transpose_square(i)] = grid[i];
         }
 
         Sudoku {
-            line_grid: grid,
+            line_grid: copy,
             col_grid: transposed_col,
             square_grid: transposed_square,
         }
@@ -61,6 +70,8 @@ impl Sudoku<'_> {
         (i * 9) % 81 + i / 9
     }
 
+    /// transform an index of a line-by-line \[u8; 81] representation of a sudoku to the index of
+    /// the square-by-square \[u8; 81] representation of the same sudoku
     fn transpose_square(i: usize) -> usize {
         (((i % 9) / 3) % 3) * 26 + i % 3 + i / 3
     }
@@ -79,26 +90,29 @@ impl Sudoku<'_> {
     fn is_tile_valid(&self, i: usize, n: u8) -> bool {
         assert!(i < 81);
 
-        let n_vec = u8x8::from_array([n; 8]);
+        // Use a SIMD vector with 16 elements. The first 9 contain n because they will be compared to the line,
+        // column, and square. The last 7 contain a number that will never equal another number in the sudoku
+        // (it can't be 0 because 0 encodes no number so it is present in the sudoku).
+        let n_vec = u8x16::from_array([n, n, n, n, n, n, n, n, n, 10, 10, 10, 10, 10, 10, 10]);
 
         // check that the same number is not in the same line
         let start = (i / 9) * 9;
-        let vec = u8x8::from_slice(&self.line_grid[start..start + 9]);
-        if n_vec.simd_eq(vec).any() || n == self.line_grid[start + 8] {
+        let vec = u8x16::from_slice(&self.line_grid[start..start + 16]);
+        if n_vec.simd_eq(vec).any() {
             return false;
         }
 
         // check that the same number is not in the same column
         let start = (i % 9) * 9;
-        let vec = u8x8::from_slice(&self.col_grid[start..start + 9]);
-        if n_vec.simd_eq(vec).any() || n == self.col_grid[start + 8] {
+        let vec = u8x16::from_slice(&self.col_grid[start..start + 16]);
+        if n_vec.simd_eq(vec).any() {
             return false;
         }
 
         // check that the same number is not in the same square
         let start = (Sudoku::transpose_square(i) / 9) * 9;
-        let vec = u8x8::from_slice(&self.square_grid[start..start + 9]);
-        if n_vec.simd_eq(vec).any() || n == self.square_grid[start + 8] {
+        let vec = u8x16::from_slice(&self.square_grid[start..start + 16]);
+        if n_vec.simd_eq(vec).any() {
             return false;
         }
 
