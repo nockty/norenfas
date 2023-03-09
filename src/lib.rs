@@ -33,26 +33,36 @@ fn rec_solve(i: usize, sudoku: &mut Sudoku) -> bool {
 struct Sudoku<'a> {
     line_grid: &'a mut [u8; 81],
     col_grid: [u8; 81],
+    square_grid: [u8; 81],
 }
 
 impl Sudoku<'_> {
     fn new(grid: &mut [u8; 81]) -> Sudoku {
         // create the transposed sudoku (column-by-column representation)
-        let mut transposed = [0u8; 81];
+        let mut transposed_col = [0u8; 81];
         for i in 0..81 {
-            transposed[Self::transpose(i)] = grid[i]
+            transposed_col[Self::transpose_col(i)] = grid[i]
+        }
+        let mut transposed_square = [0u8; 81];
+        for i in 0..81 {
+            transposed_square[Self::transpose_square(i)] = grid[i]
         }
 
         Sudoku {
             line_grid: grid,
-            col_grid: transposed,
+            col_grid: transposed_col,
+            square_grid: transposed_square,
         }
     }
 
     /// transform an index of a line-by-line \[u8; 81] representation of a sudoku to the index of
     /// the column-by-column \[u8; 81] representation of the same sudoku
-    fn transpose(i: usize) -> usize {
+    fn transpose_col(i: usize) -> usize {
         (i * 9) % 81 + i / 9
+    }
+
+    fn transpose_square(i: usize) -> usize {
+        (((i % 9) / 3) % 3) * 26 + i % 3 + i / 3
     }
 
     fn get(&self, i: usize) -> u8 {
@@ -61,37 +71,35 @@ impl Sudoku<'_> {
 
     fn set(&mut self, i: usize, n: u8) {
         self.line_grid[i] = n;
-        self.col_grid[Self::transpose(i)] = n;
+        self.col_grid[Self::transpose_col(i)] = n;
+        self.square_grid[Self::transpose_square(i)] = n;
     }
 
     /// check that n would be a valid number at index i in the sudoku
     fn is_tile_valid(&self, i: usize, n: u8) -> bool {
-        // check that the same number is not in the same line
-        let line = i / 9;
-        // use SIMD vectors for faster comparison
+        assert!(i < 81);
+
         let n_vec = u8x8::from_array([n; 8]);
-        let line_vec = u8x8::from_slice(&self.line_grid[line * 9..line * 9 + 9]);
-        if n_vec.simd_eq(line_vec).any() || n == self.line_grid[line * 9 + 8] {
+
+        // check that the same number is not in the same line
+        let start = (i / 9) * 9;
+        let vec = u8x8::from_slice(&self.line_grid[start..start + 9]);
+        if n_vec.simd_eq(vec).any() || n == self.line_grid[start + 8] {
             return false;
         }
 
         // check that the same number is not in the same column
-        let col = i % 9;
-        // use SIMD vectors for faster comparison
-        let col_vec = u8x8::from_slice(&self.col_grid[col * 9..col * 9 + 9]);
-        if n_vec.simd_eq(col_vec).any() || n == self.col_grid[col * 9 + 8] {
+        let start = (i % 9) * 9;
+        let vec = u8x8::from_slice(&self.col_grid[start..start + 9]);
+        if n_vec.simd_eq(vec).any() || n == self.col_grid[start + 8] {
             return false;
         }
 
         // check that the same number is not in the same square
-        let square_line = line / 3;
-        let square_col = col / 3;
-        for y in square_line * 3..square_line * 3 + 3 {
-            for x in square_col * 3..square_col * 3 + 3 {
-                if n == self.line_grid[y * 9 + x] {
-                    return false;
-                }
-            }
+        let start = (Sudoku::transpose_square(i) / 9) * 9;
+        let vec = u8x8::from_slice(&self.square_grid[start..start + 9]);
+        if n_vec.simd_eq(vec).any() || n == self.square_grid[start + 8] {
+            return false;
         }
 
         return true;

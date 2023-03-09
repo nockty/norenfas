@@ -13,9 +13,9 @@ The `benches` folder contains a couple [Criterion.rs](https://bheisler.github.io
 Typical results on my machine:
 
 ```
-solve easy:   ~6µs
-solve medium: ~170µs
-solve hard:   ~270µs
+solve easy:   ~5µs
+solve medium: ~140µs
+solve hard:   ~230µs
 ```
 
 To profile and get a [flamegraph](https://github.com/flamegraph-rs/flamegraph): `cargo flamegraph --root --bench solve_benchmark -- --bench`. Well, it isn't that useful for this project that has about two functions.
