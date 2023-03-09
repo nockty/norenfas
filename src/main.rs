@@ -1,19 +1,23 @@
-use norenfas::{pretty_print, solve};
+use core::panic;
+use std::{env, fs};
+
+use norenfas::{
+    io::{parse_from_file, pretty_print},
+    solve,
+};
 
 fn main() {
-    let mut sudoku: [u8; 81] = [
-        8, 0, 6, 0, 2, 0, 5, 0, 7, //
-        0, 0, 2, 0, 0, 0, 4, 0, 0, //
-        3, 7, 0, 0, 0, 0, 0, 9, 1, //
-        //
-        0, 0, 0, 4, 5, 6, 0, 0, 0, //
-        5, 0, 0, 1, 0, 3, 0, 0, 6, //
-        0, 0, 0, 8, 7, 2, 0, 0, 0, //
-        //
-        4, 3, 0, 0, 0, 0, 0, 7, 5, //
-        0, 0, 5, 0, 0, 0, 9, 0, 0, //
-        7, 0, 1, 0, 4, 0, 6, 0, 3, //
-    ];
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        panic!("missing argument file_path");
+    }
+    let file_path = &args[1];
+    let mut sudoku = match parse_from_file(file_path) {
+        Err(e) => {
+            panic!("error when parsing file {}: {}", file_path, e);
+        }
+        Ok(sudoku) => sudoku,
+    };
     pretty_print(&sudoku);
     println!("Solving the sudoku...");
     solve(&mut sudoku);

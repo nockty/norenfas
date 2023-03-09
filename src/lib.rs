@@ -1,6 +1,8 @@
 #![feature(portable_simd)]
 use std::simd::{u8x16, SimdPartialEq};
 
+pub mod io;
+
 pub fn solve(sudoku: &mut [u8; 81]) -> bool {
     let grid = sudoku;
     let mut sudoku = Sudoku::new(grid);
@@ -241,25 +243,4 @@ mod tests {
         let solved = solve(&mut invalid);
         assert_eq!(false, solved);
     }
-}
-
-const FULL_LINE: &str = "+-----+-----+-----+";
-
-pub fn pretty_print(sudoku: &[u8; 81]) {
-    for line in 0..9 {
-        if line % 3 == 0 {
-            println!("{}", FULL_LINE);
-        }
-        print!("|");
-        for col in 0..9 {
-            let n = sudoku[line * 9 + col];
-            match n {
-                0 => print!(" "),
-                _ => print!("{}", n),
-            }
-            print!("|");
-        }
-        println!()
-    }
-    println!("{}", FULL_LINE);
 }
