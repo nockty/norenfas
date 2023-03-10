@@ -106,24 +106,11 @@ impl Sudoku {
         let n_vec = u8x16::from_array([n, n, n, n, n, n, n, n, n, 10, 10, 10, 10, 10, 10, 10]);
 
         // check that the same number is not in the same line
-        let start = (i / 9) * 9;
-        if Self::simd_check(n_vec, &self.line_grid, start) {
-            return false;
-        }
-
-        // check that the same number is not in the same column
-        let start = (i % 9) * 9;
-        if Self::simd_check(n_vec, &self.col_grid, start) {
-            return false;
-        }
-
-        // check that the same number is not in the same box
-        let start = (Sudoku::transpose_box(i) / 9) * 9;
-        if Self::simd_check(n_vec, &self.box_grid, start) {
-            return false;
-        }
-
-        return true;
+        !(Self::simd_check(n_vec, &self.line_grid, i / 9 * 9)
+            // or in the same column
+            || Self::simd_check(n_vec, &self.col_grid, (i % 9) * 9)
+            // or in the same box
+            || Self::simd_check(n_vec, &self.box_grid, Sudoku::transpose_box(i) / 9 * 9))
     }
 
     /// Return true iff the intersection of n_vec and slice from start_index is not empty.
