@@ -1,30 +1,31 @@
-use std::{
-    error::Error,
-    fmt::{self, Display},
-    fs,
-};
+use std::{error::Error, fmt, fs};
 
 const FULL_LINE: &str = "+-----+-----+-----+";
+const SEPARATOR: &str = "|";
 
+/// Nicely print a sudoku to stdout.
 pub fn pretty_print(sudoku: &[u8; 81]) {
     for line in 0..9 {
         if line % 3 == 0 {
             println!("{}", FULL_LINE);
         }
-        print!("|");
+        print!("{}", SEPARATOR);
         for col in 0..9 {
             let n = sudoku[line * 9 + col];
             match n {
                 0 => print!(" "),
                 _ => print!("{}", n),
             }
-            print!("|");
+            print!("{}", SEPARATOR);
         }
         println!()
     }
     println!("{}", FULL_LINE);
 }
 
+/// Build a sudoku from a file. The file must contain 9 lines with 9 characters each. Each character must
+/// either be a digit from 1 to 9 or `.`, which represents an empty tile. The returned sudoku is a
+/// line-by-line \[u8; 81] representation: index i contains digit in line i // 9, column i % 9.
 pub fn parse_from_file(file_path: &str) -> Result<[u8; 81], Box<dyn Error>> {
     let mut sudoku = [0u8; 81];
 
@@ -51,6 +52,13 @@ pub fn parse_from_file(file_path: &str) -> Result<[u8; 81], Box<dyn Error>> {
             }
             match c.to_digit(10) {
                 Some(n) => {
+                    // n must be from 1 to 9
+                    if n == 0 {
+                        return Err(Box::new(InvalidSudokuFile::new(&format!(
+                            "invalid character {} in sudoku file",
+                            n
+                        ))));
+                    }
                     sudoku[j * 9 + i] = n as u8;
                 }
                 None => {

@@ -1,5 +1,5 @@
 use core::panic;
-use std::{env, fs};
+use std::env;
 
 use norenfas::{
     io::{parse_from_file, pretty_print},
@@ -18,8 +18,9 @@ fn main() {
         }
         Ok(sudoku) => sudoku,
     };
+    println!("Sudoku to solve:");
     pretty_print(&sudoku);
-    println!("Solving the sudoku...");
+    println!("Solving...");
     solve(&mut sudoku);
     pretty_print(&sudoku);
 }

@@ -1,13 +1,17 @@
 #![feature(portable_simd)]
-use std::simd::{u8x16, SimdPartialEq};
+use std::simd::{u8x16, Simd, SimdPartialEq};
 
+/// Contains functions related to parsing and printing sudokus.
 pub mod io;
 
+/// Solve the sudoku in place, returning true if the sudoku has been successfully solved, else false.
 pub fn solve(sudoku: &mut [u8; 81]) -> bool {
     let grid = sudoku;
+    // create optimized representation of the sudoku
     let mut sudoku = Sudoku::new(grid);
 
     if rec_solve(0, &mut sudoku) {
+        // copy sudoku once solved
         for i in 0..81 {
             grid[i] = sudoku.line_grid[i]
         }
@@ -16,53 +20,57 @@ pub fn solve(sudoku: &mut [u8; 81]) -> bool {
     return false;
 }
 
+/// Try to solve a sudoku that has been solved until index i.
 fn rec_solve(i: usize, sudoku: &mut Sudoku) -> bool {
+    // base case: sudoku is fully solved!
     if i >= 81 {
         return true;
     }
+    // index already contained a digit in the initial sudoku
     if sudoku.get(i) != 0 {
         return rec_solve(i + 1, sudoku);
     }
-    for n in 1..10 {
+    // try each possible digit
+    for n in 1..=9 {
         if !sudoku.is_tile_valid(i, n) {
             continue;
         }
-        // try using n in the tile
+        // try using n in the tile if valid, proceed to next step
         sudoku.set(i, n);
         if rec_solve(i + 1, sudoku) {
             return true;
         }
     }
-    // nothing works: reset the tile and backtrack
+    // no digit works: reset the tile and backtrack
     sudoku.set(i, 0);
     return false;
 }
 
-/// Sudoku holds line-by-line, column-by-column, and square-by-square representations of the same sudoku.
-/// The goal is to be able to use SIMD operations for all kinds of checks. Their length is 88 so that we
-/// can use 128-bit SIMD vectors with 16 elements.
+/// Sudoku holds line-by-line, column-by-column, and box-by-box representations of the same sudoku.
+/// The goal is to be able to use SIMD operations for all kinds of checks. Their length is 88 so
+/// that we can use 128-bit SIMD vectors with 16 elements (81 - 9 + 16 = 88).
 struct Sudoku {
     line_grid: [u8; 88],
     col_grid: [u8; 88],
-    square_grid: [u8; 88],
+    box_grid: [u8; 88],
 }
 
 impl Sudoku {
     fn new(grid: &mut [u8; 81]) -> Sudoku {
         let mut copy = [0u8; 88];
         let mut transposed_col = [0u8; 88];
-        let mut transposed_square = [0u8; 88];
+        let mut transposed_box = [0u8; 88];
 
         for i in 0..81 {
             copy[i] = grid[i];
             transposed_col[Self::transpose_col(i)] = grid[i];
-            transposed_square[Self::transpose_square(i)] = grid[i];
+            transposed_box[Self::transpose_box(i)] = grid[i];
         }
 
         Sudoku {
             line_grid: copy,
             col_grid: transposed_col,
-            square_grid: transposed_square,
+            box_grid: transposed_box,
         }
     }
 
@@ -73,8 +81,8 @@ impl Sudoku {
     }
 
     /// transform an index of a line-by-line \[u8; 81] representation of a sudoku to the index of
-    /// the square-by-square \[u8; 81] representation of the same sudoku
-    fn transpose_square(i: usize) -> usize {
+    /// the box-by-box \[u8; 81] representation of the same sudoku
+    fn transpose_box(i: usize) -> usize {
         (((i % 9) / 3) % 3) * 26 + i % 3 + i / 3
     }
 
@@ -85,40 +93,44 @@ impl Sudoku {
     fn set(&mut self, i: usize, n: u8) {
         self.line_grid[i] = n;
         self.col_grid[Self::transpose_col(i)] = n;
-        self.square_grid[Self::transpose_square(i)] = n;
+        self.box_grid[Self::transpose_box(i)] = n;
     }
 
-    /// check that n would be a valid number at index i in the sudoku
+    /// check that n would be a valid digit at index i in the sudoku
     fn is_tile_valid(&self, i: usize, n: u8) -> bool {
         assert!(i < 81);
 
         // Use a SIMD vector with 16 elements. The first 9 contain n because they will be compared to the line,
-        // column, and square. The last 7 contain a number that will never equal another number in the sudoku
-        // (it can't be 0 because 0 encodes no number so it is present in the sudoku).
+        // column, and box. The last 7 contain a number that will never equal another digit in the sudoku
+        // (it can't be 0 because 0 encodes no digit, so it is present in the sudoku).
         let n_vec = u8x16::from_array([n, n, n, n, n, n, n, n, n, 10, 10, 10, 10, 10, 10, 10]);
 
         // check that the same number is not in the same line
         let start = (i / 9) * 9;
-        let vec = u8x16::from_slice(&self.line_grid[start..start + 16]);
-        if n_vec.simd_eq(vec).any() {
+        if Self::simd_check(n_vec, &self.line_grid, start) {
             return false;
         }
 
         // check that the same number is not in the same column
         let start = (i % 9) * 9;
-        let vec = u8x16::from_slice(&self.col_grid[start..start + 16]);
-        if n_vec.simd_eq(vec).any() {
+        if Self::simd_check(n_vec, &self.col_grid, start) {
             return false;
         }
 
-        // check that the same number is not in the same square
-        let start = (Sudoku::transpose_square(i) / 9) * 9;
-        let vec = u8x16::from_slice(&self.square_grid[start..start + 16]);
-        if n_vec.simd_eq(vec).any() {
+        // check that the same number is not in the same box
+        let start = (Sudoku::transpose_box(i) / 9) * 9;
+        if Self::simd_check(n_vec, &self.box_grid, start) {
             return false;
         }
 
         return true;
+    }
+
+    /// Return true iff the intersection of n_vec and slice from start_index is not empty.
+    /// Use SIMD vectors for faster check.
+    fn simd_check(n_vec: Simd<u8, 16>, slice: &[u8; 88], start_index: usize) -> bool {
+        let vec = u8x16::from_slice(&slice[start_index..start_index + 16]);
+        n_vec.simd_eq(vec).any()
     }
 }
 

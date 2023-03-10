@@ -1,10 +1,12 @@
 # norenfas
 
-Norenfas is a toy project for me to practice basic Rust skills. It is a sudoku solver.
+Norenfas is a **sudoku solver** written in Rust -- a small project for me to practice basic Rust skills. It is a straightforward solver in that it uses **brute force**: it puts every possible digit in a given tile and recursively tries to solve the sudoku.
 
-## Rust toolchain
+Even though the algorithm is simple, I optimized computations by keeping track of 3 different representations of the grid in order to leverage **SIMD vectors** for the 3 different checks that need to be performed -- line, column, and box. The SIMD operations make the solver about **3 times faster**.
 
-The solver leverages the `portable_simd` feature of the nightly channel, so it requires nightly Rust. To install it: `rustup install nightly`.
+## Build
+
+Of course `cargo build` but the solver leverages the `portable_simd` feature of the nightly channel, so it requires nightly Rust to compile. To install it: `rustup install nightly`.
 
 ## Benchmarks
 
@@ -18,7 +20,7 @@ solve medium: ~120µs
 solve hard:   ~200µs
 ```
 
-To profile and get a [flamegraph](https://github.com/flamegraph-rs/flamegraph): `cargo flamegraph --root --bench solve_benchmark -- --bench`. Well, it isn't that useful for this project that has about two functions.
+To profile and get a [flamegraph](https://github.com/flamegraph-rs/flamegraph), run: `cargo flamegraph --root --bench solve_benchmark -- --bench`. It isn't very useful for a recursive solver that has about two functions, though!
 
 ## Resources
 
